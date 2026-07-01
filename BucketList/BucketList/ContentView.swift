@@ -53,11 +53,11 @@ struct ContentView: View {
     ].sorted()
     
     //using enum
-    enum LoadingState {
-        case loading, success, failed
-    }
+//    enum LoadingState {
+//        case loading, success, failed
+//    }
     
-    @State private var loadingState = LoadingState.loading
+//    @State private var loadingState = LoadingState.loading
     
     //MapKit varibles
     @State private var position = MapCameraPosition.region(MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 16.7107, longitude: 81.0952), span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5)))
@@ -70,6 +70,15 @@ struct ContentView: View {
     
     //authentication varibles
     @State private var isUnlocked = false
+    
+    //Adding locations varaibles
+    let startPosition = MapCameraPosition.region(MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 16.7107, longitude: 81.0952), span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5)))
+    
+    //VAriables moved to viewModel.
+//    @State private var locationsToAdd = [Location]()
+//    @State private var selectedPlace: Location?
+    
+    @State private var viewModel = ViewModel()
     
     var body: some View {
 //        List(users) { user in
@@ -130,15 +139,55 @@ struct ContentView: View {
         
         //MARK: Using faceID to unloack the app.For we use LocalAuthentication
         //First go to targets -> Info -> Add a row -> privacy - FaceID -> Some text.
-        VStack{
-            if isUnlocked {
-                Text("Unlocked")
-            }else {
-                Text("Locked")
-            }
-        }
-        .onAppear(perform: authenticate)
+//        VStack{
+//            if isUnlocked {
+//                Text("Unlocked")
+//            }else {
+//                Text("Locked")
+//            }
+//        }
+//        .onAppear(perform: authenticate)
         
+        //MARK: Adding user locations to a map.
+        if viewModel.unlocked {
+            MapReader { proxy in
+                Map(initialPosition: startPosition){
+                    ForEach(viewModel.locationsToAdd) { location in
+                        //                    Marker(location.name, coordinate: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude))
+                        Annotation(location.name, coordinate: location.coordinate){
+                            Image(systemName: "star.circle")
+                                .resizable()
+                                .foregroundStyle(.red)
+                                .frame(width: 44, height: 44)
+                                .background(.white)
+                                .clipShape(.circle)
+                                .gesture(
+                                    LongPressGesture(minimumDuration: 0.2)
+                                        .onEnded { _ in
+                                            viewModel.selectedPlace = location
+                                        }
+                                )
+                        }
+                    }
+                }
+                .onTapGesture { position in
+                    if let coordinate = proxy.convert(position, from: .local){
+                        viewModel.addLocation(at: coordinate)
+                    }
+                }
+                .sheet(item: $viewModel.selectedPlace) { place in
+                    EditView(location: place) {
+                        viewModel.updateLocation(location: $0)
+                    }
+                }
+            }
+        } else {
+            Button("Unlock places", action: viewModel.authenticate)
+                .padding()
+                .background(.blue)
+                .foregroundStyle(.white)
+                .clipShape(.capsule)
+        }
     }
     
     func authenticate() {
